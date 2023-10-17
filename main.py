@@ -52,8 +52,21 @@ class Project(Base):
     user = relationship("User", back_populates="projects")
 
 
-# TODO: make another table with scores with repo name that is one to many with user
-# user 1: scores many
+class Company(Base):
+    __tablename__ = "company"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True ,index=True) ## -> czy na pewno musi byc unique?
+    job_offers = relationship("JobOffer", back_populates="company", cascade='all,delete')
+
+
+class JobOffer(Base):
+    id = Column(Integer, primary_key=True, index=True)
+    position = Column(String)
+    job_description = Column(String)
+    required_skills = Column(String)
+    salary = Column(Integer)
+    company_id = Column(Integer, ForeignKey("company.id"))
+    company = relationship("Company", back_populates="job_offer")
 
 
 # Pydantic Model for User (response)
@@ -92,6 +105,27 @@ class ProjectCreate(BaseModel):
     reliability_score: float
     standarisation_score: float
     user_id: int
+
+
+class CompanyCreate(BaseModel):
+    id: int
+    name: str
+
+
+class CompanyResponse(BaseModel):
+    id: int
+    name: str
+
+
+class JobOfferCreate(BaseModel):
+    id: int
+    position: str
+    required_skills: str
+    position: str
+    salary: int
+    job_description: str
+    company_id: int
+
 
 
 # class TaskOut(BaseModel):
