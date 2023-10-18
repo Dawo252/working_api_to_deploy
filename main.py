@@ -89,6 +89,7 @@ class UserResponse(BaseModel):
 
 # Pydantic Model for User (request - create/update)
 class UserCreate(BaseModel):
+    id: int
     email: str
     username: str
     password: str
@@ -174,8 +175,8 @@ def start(username, password, email, access_token=None):
 
 # Routes
 @app.post("/users/", response_model=UserResponse)
-def create_user(user_data: UserCreate):
-    user = User(username=user_data.username, password=user_data.password)
+def create_user(username:str, email:str, password:str):
+    user = User(username=username, password=password, email=email)
     # Add the user to the database
     db = SessionLocal()
     db.add(user)
@@ -183,7 +184,7 @@ def create_user(user_data: UserCreate):
     db.refresh(user)
     db.close()
 
-    return UserResponse(id=user.id, username=user.username)
+    return UserResponse(id=user.id, username=user.username, email=email)
 
 
 @app.get("/users/{user_id}", response_model=UserResponse)
