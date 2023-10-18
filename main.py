@@ -35,6 +35,8 @@ class User(Base):
     email = Column(String, unique=True)
     password = Column(String)
     projects = relationship("Project", back_populates="user", cascade='all,delete')
+    # company = relationship("Company", back_populates="user")
+    # company_id = Column(Integer, ForeignKey("company.id"))
 
 
 class Project(Base):
@@ -52,14 +54,23 @@ class Project(Base):
     user = relationship("User", back_populates="projects")
 
 
+# class Employer(Base):
+#     __tablename__ = "employer"
+#     id = Column(Integer, primary_key=True, index=True)
+#     name = Column(String, unique=True, index=True)
+#     email = Column(String)
+#     password = Column(String)
+
+
 class Company(Base):
     __tablename__ = "company"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True ,index=True) ## -> czy na pewno musi byc unique?
-    job_offers = relationship("JobOffer", back_populates="company", cascade='all,delete')
+    job_offer = relationship("JobOffer", back_populates="company", cascade='all,delete')
 
 
 class JobOffer(Base):
+    __tablename__ = "job_offer"
     id = Column(Integer, primary_key=True, index=True)
     position = Column(String)
     job_description = Column(String)
@@ -121,7 +132,6 @@ class JobOfferCreate(BaseModel):
     id: int
     position: str
     required_skills: str
-    position: str
     salary: int
     job_description: str
     company_id: int
@@ -137,7 +147,10 @@ Base.metadata.create_all(bind=engine)
 
 
 @app.get("/start/{access_token}")
-def start(username, password, email, access_token):
+def start(username, password, email, access_token=None):
+    if access_token is None:
+        pass
+        return "employer_account_created"
     user = User(username=username, password=password, email=email)
     db = SessionLocal()
     db.add(user)
@@ -294,3 +307,35 @@ def delete_project(project_id: int):
     db.commit()
     db.close()
     return project
+
+
+@app.put("/job_offer/{job_offer_id}", response_model=JobOfferCreate)
+def add_job_offer(position: str, required_skills: str, salary: int, job_description: str,
+                  company_name: str):
+    db = SessionLocal()
+    try:
+        db.query(Company).filter(Company.name == company_name).first().id
+    except AttributeError:
+        company = Company(name=company_name)
+        db.add(company)
+        db.commit()
+        db.refresh(company)
+        db.close()
+    company_id = db.query(Company).filter(Company.name == company_name).first().id
+    job_offer = JobOffer(position=position, required_skills=required_skills, salary=salary,
+                         job_description=job_description, company_id=company_id)
+    db.add(job_offer)
+    db.commit()
+    db.refresh(job_offer)
+    db.close()
+    return JobOfferCreate(id=job_offer.id, position=position, required_skills=required_skills, salary=salary,
+                         job_description=job_description, company_id=company_id)
+
+
+@app.get("/job_offers")
+def get_offers(company_name):
+    db = SessionLocal()
+    company_id = db.query(Company).filter(Company.name == company_name).first().id
+    job_offers = db.query(JobOffer).filter(JobOffer.company_id == company_id).all()
+    db.close()
+    return job_offers
