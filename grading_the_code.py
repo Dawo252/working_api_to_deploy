@@ -149,12 +149,6 @@ class CodeGrader:
 
     def coverage_tester(self):
         file_list = os.listdir(self.code_directory_path)
-        print( file_list)
-        print(file_list)
-        print( file_list)
-        print( file_list)
-        print( file_list)
-        print( file_list)
 
         print("starting coverage_tester")
         index = -1
@@ -229,13 +223,35 @@ class CodeGrader:
         vulnerabilities_amount = number_values_from_text[-9:-1]
 
         for key_sev, key_conf in zip(list(severity_dict), list(confidence_dict)):
-            severity_dict[key_sev] = int(vulnerabilities_amount[index])
-            confidence_dict[key_conf] = int(vulnerabilities_amount[index + 4])
+            if key_sev and key_conf == "high":
+                severity_dict[key_sev] = int(vulnerabilities_amount[index])
+                confidence_dict[key_conf] = int(vulnerabilities_amount[index + 4])
             index += 1
 
         self.vulnerability_score = max((100.0 - (sum(severity_dict.values()) + sum(confidence_dict.values()))), 0)
         #TODO: zmienic jakos obliczanie oceny dla vulnerability_score
         # print("finished vulnerability_checker")
+
+    def check_for_documentation(self):
+        file_list = os.listdir(self.code_directory_path)
+        index = -1
+        try:
+            index = file_list.index("documentation.py")
+        except ValueError:
+            pass
+        try:
+            index = file_list.index("README.py")
+        except ValueError:
+            pass
+        print(index)
+        if index != -1:
+            documentation_url = file_list[index]
+        else:
+            return 0
+        os.chmod(documentation_url, 0o777)
+        with open(documentation_url, 'r+', encoding="utf-8") as file:
+            documentation = file.read()
+        print(documentation)
 
     def calculate_code_standardization_score(self, file_path):   # -> pamiętaj, żeby zrobić iterację po folderze
         print("starting calculate_code_standardization_score")
