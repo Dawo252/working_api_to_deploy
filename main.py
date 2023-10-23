@@ -54,12 +54,13 @@ class Project(Base):
     user = relationship("User", back_populates="projects")
 
 
-# class Employer(Base):
-#     __tablename__ = "employer"
-#     id = Column(Integer, primary_key=True, index=True)
-#     name = Column(String, unique=True, index=True)
-#     email = Column(String)
-#     password = Column(String)
+class Employer(Base):
+    __tablename__ = "employer"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True)
+    email = Column(String)
+    password = Column(String)
+    company = relationship("Company", back_populates="employer", cascade='all,delete')
 
 
 class Company(Base):
@@ -67,6 +68,8 @@ class Company(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True ,index=True) ## -> czy na pewno musi byc unique?
     job_offer = relationship("JobOffer", back_populates="company", cascade='all,delete')
+    employer_id = Column(Integer, ForeignKey("employer.id"))
+    company = relationship("Employer", back_populates="company")
 
 
 class JobOffer(Base):
@@ -147,7 +150,7 @@ class JobOfferCreate(BaseModel):
 Base.metadata.create_all(bind=engine)
 
 
-@app.get("/start/{access_token}")
+@app.post("/start/{access_token}")
 def start(username, password, email, access_token=None):
     if access_token is None:
         pass
@@ -195,6 +198,7 @@ def get_user(user_id: int):
     db.close()
 
     if not user:
+        db.close()
         raise HTTPException(status_code=404, detail="User not found")
 
     return UserResponse(id=user.id, username=user.username)
@@ -208,6 +212,7 @@ def get_all_users():
     db.close()
 
     if not users:
+        db.close()
         raise HTTPException(status_code=404, detail="Users not found")
 
     return users
@@ -256,6 +261,7 @@ def get_project(project_id: int):
     project = db.query(Project).filter(Project.id == project_id).first()
     db.close()
     if not project:
+        db.close()
         raise HTTPException(status_code=404, detail="Project not found")
     return project
 
@@ -267,6 +273,7 @@ def get_all_projects_of_user(user_id):
     print(project)
     db.close()
     if not project:
+        db.close()
         raise HTTPException(status_code=404, detail="Projects not found")
     return project
 
@@ -278,6 +285,7 @@ def get_all_projects():
     print(project)
     db.close()
     if not project:
+        db.close()
         raise HTTPException(status_code=404, detail="Projects not found")
     return project
 
@@ -310,7 +318,7 @@ def delete_project(project_id: int):
     return project
 
 
-@app.put("/job_offer/{job_offer_id}", response_model=JobOfferCreate)
+@app.post("/job_offer/{job_offer_id}", response_model=JobOfferCreate)
 def add_job_offer(position: str, required_skills: str, salary: int, job_description: str,
                   company_name: str):
     db = SessionLocal()
