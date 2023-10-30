@@ -87,9 +87,8 @@ class GetUserRepos:
     @staticmethod
     def clone_repository(repo_url, output_directory):
         if repo_url is not None:
-            print("started downloading")
             try:
-                git.Repo.clone_from(repo_url, output_directory, filter=['blob:none'], depth=1, sparse=True)
+                os.system(f'sudo git clone --filter=blob:none --depth 1 {repo_url} {output_directory} ')
                 print("done downloading")
             except git.exc.InvalidGitRepositoryError:
                 print("no repo")
@@ -98,9 +97,8 @@ class GetUserRepos:
 
     def clone_repositories(self):
         for repo in self.repo_paths_list:
-            self.clone_repository(repo, self.output_directory+f"/{repo.split('.com/', 1)[1]}")
+            self.clone_repository(repo, self.output_directory + f"/{repo.split('.com/', 1)[1]}")
 
-    @staticmethod
     def reorganize_repository(repo_directory, output_directory):
         index_of_the_main_folder = None
         if not os.path.exists(output_directory):
@@ -108,31 +106,27 @@ class GetUserRepos:
         for root, _, files in os.walk(repo_directory):
             for filename in files:
                 root = root.replace("\\", "/")
-                # print(root)
                 file_path = root + f'/{filename}'
                 file_path_list = file_path.split("/")
                 if index_of_the_main_folder is None:
                     index_of_the_main_folder = file_path_list.index("testtt")
-                if not (Path.cwd() / output_directory / file_path_list[index_of_the_main_folder+2]).exists():
-                    print(f'{output_directory}/{file_path_list[index_of_the_main_folder+2]}')
-                    os.mkdir(output_directory + f'/{file_path_list[index_of_the_main_folder+2]}')
-                new_file_path = output_directory + f'/{file_path_list[index_of_the_main_folder+2]}' + f'/{filename}'
-                print(new_file_path)
+                if not (Path.cwd() / output_directory / file_path_list[index_of_the_main_folder + 2]).exists():
+                    os.mkdir(output_directory + f'/{file_path_list[index_of_the_main_folder + 2]}')
+                new_file_path = output_directory + f'/{file_path_list[index_of_the_main_folder + 2]}' + f'/{filename}'
+                os.system(f'sudo chmod -R 777 /home/ubuntu/tests/testtt')
+                os.system(f'sudo chmod -R 777 /home/ubuntu/tests/testtt2')
                 shutil.move(file_path, new_file_path)
+        print("moved shit out")
 
     def remove_files_with_other_extensions(self):
-        for root, _, files in os.walk(self.output_directory+"2"):  # TODO change it later so it is not hardcoded 2
+        os.system(f'sudo chmod -R 777 /home/ubuntu/tests/testtt2')
+        os.system(f'sudo chmod -R 777 /home/ubuntu/tests/testtt')
+        for root, _, files in os.walk(self.output_directory):  # TODO change it later so it is not hardcoded 2
             for filename in files:
-                print(filename)
                 filename2 = filename.replace("\\", "/")
-                # file_path = os.path.join(root, filename)
                 root = root.replace("\\", "/")
                 file_path = root + f'/{filename2}'
-                os.chmod(file_path, stat.S_IWRITE)
                 file_extension = os.path.splitext(filename2)[1]
-                if file_extension.lower() not in [ext.lower() for exts in language_extensions.values() for ext in
-                                                  exts]:
+                if file_extension.lower() not in [ext.lower() for exts in language_extensions.values() for ext in exts]:
                     if os.path.isfile(file_path):
-                        # if file_path.find('.git') == -1:
-                        print(f"deleting: {file_path}")
                         os.remove(file_path)

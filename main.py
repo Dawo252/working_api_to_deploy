@@ -97,7 +97,7 @@ def start(username, password, email, access_token=None, db=Depends(get_db)):
     print(user.id)
     db.commit()
     db.refresh(user)
-    kwargs = {"access_token": access_token}
+    kwargs = {"access_token": access_token, "folder": "/home/ubuntu/tests/testtt"}
     projects = task_1.apply_async(queue="user_github_que2", kwargs=kwargs)
     for name, ratings in projects.get().items():
         project = Project(name=name, vulnerability_score=ratings["vulnerability_score"],

@@ -10,16 +10,16 @@ celery = create_celery()
 
 @celery.task(name="task_1", bind=True, max_retries=3, default_retry_delay=10, queue="user_github_que2") #  ack_late=True, jesli chcemy od razu usuwac po odczytaniu wiadomosci z que
 def task_1(self, **kwargs):  # change get user repos to be linear -> done
-    github_something = GetUserRepos("/home/dawo252/tests/testtt")
+    github_something = GetUserRepos(kwargs["folder"])
     github_something.get_github_repo_names(access_token=kwargs["access_token"])
     print(github_something.repo_names_list)
     print(github_something.repo_paths_list)
     github_something.clone_repositories()
-    github_something.reorganize_repository(f"/home/dawo252/tests/testtt",
-                                           "/home/dawo252/tests/testtt2")
+    github_something.reorganize_repository(kwargs["folder"],
+                                           kwargs["folder"] + "2")
     github_something.remove_files_with_other_extensions()
 
-    folder = "/home/dawo252/tests/testtt2"
+    folder = kwargs["folder"] + "2"
     dir_dict = os.listdir(folder)
     grade_dict = {}
     for repo in dir_dict:
@@ -35,20 +35,12 @@ def task_1(self, **kwargs):  # change get user repos to be linear -> done
         temp_dict["standarisation_score"] = code.standarisation_score
         grade_dict[repo] = temp_dict
 
-    print(grade_dict)
-    for each in os.listdir("/home/dawo252/tests"):
-        if each.startswith("testtt") and each != "testtt2":
-            for root, dirs, files in os.walk(f"/home/dawo252/tests/{each}"):
-                for f in files:
-                    os.unlink(os.path.join(root, f))
-                for d in dirs:
-                    shutil.rmtree(os.path.join(root, d))
-
-    for root, dirs, files in os.walk("/home/dawo252/tests/testtt2"):
-        for f in files:
-            os.unlink(os.path.join(root, f))
-        for d in dirs:
-            shutil.rmtree(os.path.join(root, d))
+    os.system(f"sudo rm -rf {kwargs['folder'] + '2'}")
+    os.system(f"sudo rm -rf {kwargs['folder']}")
+    os.system(f"sudo mkdir {kwargs['folder']}")
+    os.system(f"sudo mkdir {kwargs['folder'] + '2'}")
+    os.system(f"sudo chmod 777 {kwargs['folder']} {kwargs['folder'] + '2'}")
+    print("done and ready for next")
 
     return grade_dict
 
