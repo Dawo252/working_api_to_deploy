@@ -1,7 +1,7 @@
 from celery_app.utils import create_celery
 from core.config import get_settings
-from getting_user_repos import GetUserRepos
-from grading_the_code import CodeGrader
+from backend_actions.getting_user_repos import GetUserRepos
+from backend_actions.grading_the_code import CodeGrader
 import os, shutil
 
 settings = get_settings()
