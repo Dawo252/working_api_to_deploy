@@ -88,6 +88,12 @@ class CodeGrader:
         else:
             return 20
 
+
+    @staticmethod
+    def check_for_design_patterns(file_path):
+        with open(file_path, 'r+', encoding="utf-8") as file:
+            code = file.read()
+
     @staticmethod
     def rate_code_reliability(file_path):  # -> pamiętaj, żeby zrobić iterację po folderze
         print("starting rate_code_reliability")
@@ -343,7 +349,6 @@ class CodeGrader:
         self.reliability_score = reliability_score_sum/divider
         self.standarisation_score = standarisation_score_sum/divider
         # print("finishing run_single_file_tests")
-
 
 """ metody, które wykonują się na całym folderze zostaw jako metody funkcji, a jeśli działają na pojedynczym pliku
     to zrób je statyczne i potem zrób jedną metodę klasy która je wszystkie na pętli wykona"""
