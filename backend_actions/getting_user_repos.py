@@ -99,7 +99,7 @@ class GetUserRepos:
         for repo in self.repo_paths_list:
             self.clone_repository(repo, self.output_directory + f"/{repo.split('.com/', 1)[1]}")
 
-    def reorganize_repository(repo_directory, output_directory):
+    def reorganize_repository(self, repo_directory, output_directory):
         index_of_the_main_folder = None
         if not os.path.exists(output_directory):
             os.mkdir(output_directory)

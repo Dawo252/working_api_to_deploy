@@ -97,7 +97,8 @@ class CodeGrader:
     @staticmethod
     def rate_code_reliability(file_path):  # -> pamiętaj, żeby zrobić iterację po folderze
         print("starting rate_code_reliability")
-        os.chmod(file_path, 0o777)
+        os.system(f"sudo chmod 777 {file_path}")
+        #os.chmod(file_path, 0o777)
         pylint_output = pylint.lint.Run([file_path], do_exit=False)
         pylint_score = None
         reliability_score = None
@@ -254,18 +255,27 @@ class CodeGrader:
             documentation_url = file_list[index]
         else:
             return 0
-        os.chmod(documentation_url, 0o777)
+        os.system(f"sudo chmod 777 {document_url}")
         with open(documentation_url, 'r+', encoding="utf-8") as file:
             documentation = file.read()
         print(documentation)
 
     def calculate_code_standardization_score(self, file_path):   # -> pamiętaj, żeby zrobić iterację po folderze
         print("starting calculate_code_standardization_score")
-        os.chmod(file_path, 0o777)
-        with open(file_path, 'r+', encoding="utf-8") as file:
-            # print("started reading the code")
-            code = file.read()
-            # print("read the code")
+        os.system(f"sudo chmod 777 {file_path}")
+        try:
+            with open(file_path, 'r+', encoding="utf-8") as file:
+                # print("started reading the code")
+                code = file.read()
+                # print("read the code")
+        except UnicodeDecodeError:
+            try:
+                with open(file_path, 'r+', encoding="latin1", ) as file:
+                    # print("started reading the code")
+                    code = file.read()
+                    # print("read the code")
+            except Exception:
+                pass
         score = 0
         max_score = 80  # Maksymalna liczba punktów za podstawowe kryteria
 
