@@ -8,8 +8,6 @@ settings = app_settings()
 class BaseSettings:
     """ here I configure celery_app"""
 
-    aws_access_key_id = safequote("AKIA36DFXFF34UAZVBMY")
-    aws_secret_access_key = safequote("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")
 
     broker_url = "sqs://{aws_access_key}:{aws_secret_key}@".format(
         aws_access_key=aws_access_key_id, aws_secret_key=aws_secret_access_key,
