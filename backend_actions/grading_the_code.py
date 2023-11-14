@@ -255,7 +255,7 @@ class CodeGrader:
             documentation_url = file_list[index]
         else:
             return 0
-        os.system(f"sudo chmod 777 {document_url}")
+        os.system(f"sudo chmod 777 {documentation_url}")
         with open(documentation_url, 'r+', encoding="utf-8") as file:
             documentation = file.read()
         print(documentation)
@@ -352,7 +352,7 @@ class CodeGrader:
         for file_name in file_list:
             print(file_name)
             effeciency_score_sum += self.evaluate_efficiency(prefix + f'/{file_name}')
-            # reliability_score_sum += self.rate_code_reliability(prefix + f'/{file_name}')
+            reliability_score_sum += self.rate_code_reliability(prefix + f'/{file_name}')
             standarisation_score_sum += self.calculate_code_standardization_score(prefix + f'/{file_name}')
 
         self.efficiency_score = effeciency_score_sum/divider

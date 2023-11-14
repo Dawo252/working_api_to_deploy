@@ -54,8 +54,20 @@ language_extensions = {
 
 
 class GetUserRepos:
-    def __init__(self, output_directory, repo_paths_list=None, repo_names_list=None):
-        self.output_directory = output_directory
+    def __init__(self, main_directory, folder_core_name, repo_paths_list=None, repo_names_list=None):
+        self.main_directory = main_directory
+        self.folder_core_name = folder_core_name
+        if main_directory is not None:
+            number_of_directories = 0
+            list_of_direcories_indexes = []
+            directory_list = os.listdir(f"{main_directory}")
+            for directory in directory_list:
+                list_of_direcories_indexes.append(int(directory[6:]))
+            if len(list_of_direcories_indexes) > 0:
+                number_of_directories = max(list_of_direcories_indexes)
+            self._number_of_directories = number_of_directories
+            self.first_directory = f"{self.main_directory}/{folder_core_name}{self._number_of_directories + 1}"
+            self.reorganized_directory = f"{self.main_directory}/{folder_core_name}{self._number_of_directories + 2}"
         if repo_paths_list is None:
             self.repo_paths_list = set()
         if repo_names_list is None:
@@ -85,10 +97,10 @@ class GetUserRepos:
                 url)
 
     @staticmethod
-    def clone_repository(repo_url, output_directory):
+    def clone_repository(repo_url, directory):
         if repo_url is not None:
             try:
-                os.system(f'sudo git clone --filter=blob:none --depth 1 {repo_url} {output_directory} ')
+                os.system(f'sudo git clone --filter=blob:none --depth 1 {repo_url} {directory} ')
                 print("done downloading")
             except git.exc.InvalidGitRepositoryError:
                 print("no repo")
@@ -97,31 +109,34 @@ class GetUserRepos:
 
     def clone_repositories(self):
         for repo in self.repo_paths_list:
-            self.clone_repository(repo, self.output_directory + f"/{repo.split('.com/', 1)[1]}")
+            self.clone_repository(repo, self.first_directory + f"/{repo.split('.com/', 1)[1]}")
 
-    def reorganize_repository(self, repo_directory, output_directory):
+    def reorganize_repository(self):
         index_of_the_main_folder = None
-        if not os.path.exists(output_directory):
-            os.mkdir(output_directory)
-        for root, _, files in os.walk(repo_directory):
+        if not os.path.exists(self.reorganized_directory):
+            os.system(f"sudo mkdir {self.reorganized_directory}")
+        os.system(f"sudo chmod 777 {self.first_directory} {self.reorganized_directory}")
+        for root, _, files in os.walk(self.first_directory):
             for filename in files:
                 root = root.replace("\\", "/")
                 file_path = root + f'/{filename}'
                 file_path_list = file_path.split("/")
                 if index_of_the_main_folder is None:
-                    index_of_the_main_folder = file_path_list.index("testtt")
-                if not (Path.cwd() / output_directory / file_path_list[index_of_the_main_folder + 2]).exists():
-                    os.mkdir(output_directory + f'/{file_path_list[index_of_the_main_folder + 2]}')
-                new_file_path = output_directory + f'/{file_path_list[index_of_the_main_folder + 2]}' + f'/{filename}'
-                os.system(f'sudo chmod -R 777 /home/ubuntu/tests/testtt')
-                os.system(f'sudo chmod -R 777 /home/ubuntu/tests/testtt2')
+                    index_of_the_main_folder = file_path_list.index(f"{self.folder_core_name}"
+                                                                    f"{self._number_of_directories + 1}")
+                if not (Path.cwd() / self.reorganized_directory / file_path_list[index_of_the_main_folder + 2]).exists():
+                    os.mkdir(self.reorganized_directory + f'/{file_path_list[index_of_the_main_folder + 2]}')
+                new_file_path = self.reorganized_directory + f'/{file_path_list[index_of_the_main_folder + 2]}' + \
+                                f'/{filename}'
+                os.system(f'sudo chmod -R 777 {self.first_directory}')
+                os.system(f'sudo chmod -R 777 {self.reorganized_directory}')
                 shutil.move(file_path, new_file_path)
         print("moved shit out")
 
     def remove_files_with_other_extensions(self):
-        os.system(f'sudo chmod -R 777 /home/ubuntu/tests/testtt2')
-        os.system(f'sudo chmod -R 777 /home/ubuntu/tests/testtt')
-        for root, _, files in os.walk(self.output_directory):  # TODO change it later so it is not hardcoded 2
+        os.system(f'sudo chmod -R 777 {self.first_directory}')
+        os.system(f'sudo chmod -R 777 {self.reorganized_directory}')
+        for root, _, files in os.walk(self.first_directory):
             for filename in files:
                 filename2 = filename.replace("\\", "/")
                 root = root.replace("\\", "/")

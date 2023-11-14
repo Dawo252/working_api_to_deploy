@@ -10,16 +10,16 @@ celery = create_celery()
 
 @celery.task(name="task_1", bind=True, max_retries=3, default_retry_delay=10, queue="user_github_que2") #  ack_late=True, jesli chcemy od razu usuwac po odczytaniu wiadomosci z que
 def task_1(self, **kwargs):  # change get user repos to be linear -> done
-    github_something = GetUserRepos(kwargs["folder"])
+
+    github_something = GetUserRepos("/home/ubuntu/tests", "testtt")
     github_something.get_github_repo_names(access_token=kwargs["access_token"])
     print(github_something.repo_names_list)
     print(github_something.repo_paths_list)
     github_something.clone_repositories()
-    github_something.reorganize_repository(kwargs["folder"],
-                                           kwargs["folder"] + "2")
     github_something.remove_files_with_other_extensions()
+    github_something.reorganize_repository()
 
-    folder = kwargs["folder"] + "2"
+    folder = github_something.reorganized_directory
     dir_dict = os.listdir(folder)
     grade_dict = {}
     for repo in dir_dict:
@@ -34,12 +34,8 @@ def task_1(self, **kwargs):  # change get user repos to be linear -> done
         temp_dict["reliability_score"] = code.reliability_score
         temp_dict["standarisation_score"] = code.standarisation_score
         grade_dict[repo] = temp_dict
-
-    os.system(f"sudo rm -rf {kwargs['folder'] + '2'}")
-    os.system(f"sudo rm -rf {kwargs['folder']}")
-    os.system(f"sudo mkdir {kwargs['folder']}")
-    os.system(f"sudo mkdir {kwargs['folder'] + '2'}")
-    os.system(f"sudo chmod 777 {kwargs['folder']} {kwargs['folder'] + '2'}")
+    os.system(f"sudo rm -rf {github_something.reorganized_directory}")
+    os.system(f"sudo rm -rf {github_something.first_directory}")
     print("done and ready for next")
 
     return grade_dict
