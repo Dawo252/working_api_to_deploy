@@ -7,6 +7,8 @@ from mangum import Mangum
 from api.database_setup import Base, engine, get_db
 from api.models.models import User, JobOffer, Employer, Project, Company
 from passlib.context import CryptContext
+from working_api_to_deploy.auth.JWT_handler import sign_jwt
+from auth.JWT_bearer import JwtBearer
 
 # FastAPI instance
 app = FastAPI()
@@ -71,7 +73,7 @@ class JobOfferCreate(BaseModel):
     required_skills: str
     salary: int
     job_description: str
-    company_id: int
+    employer_id: int
 
 
 #will create table into database
@@ -88,7 +90,7 @@ def verify_password(plain_text_password, hashed_password):
 
 
 @app.post("/start/{access_token}")
-def start(username, password, email, access_token=None, db=Depends(get_db)):
+def start(username: str, password: str, email: str, access_token: str = None, db=Depends(get_db)):
     if access_token is None:
         pass
         return "employer_account_created"
@@ -97,7 +99,7 @@ def start(username, password, email, access_token=None, db=Depends(get_db)):
     print(user.id)
     db.commit()
     db.refresh(user)
-    kwargs = {"access_token": access_token, "folder": "/home/ubuntu/tests/testtt"}
+    kwargs = {"access_token": access_token}
     projects = task_1.apply_async(queue="user_github_que2", kwargs=kwargs)
     for name, ratings in projects.get().items():
         project = Project(name=name, vulnerability_score=ratings["vulnerability_score"],
@@ -111,7 +113,7 @@ def start(username, password, email, access_token=None, db=Depends(get_db)):
 
 # Routes
 @app.post("/users/", response_model=UserResponse)
-def create_user(username:str, email:str, password:str, db=Depends(get_db)):
+def create_user(username: str, email: str, password: str, db=Depends(get_db)):
     password = get_hashed_password(password)
     user = User(username=username, password=password, email=email)
     # Add the user to the database
@@ -123,9 +125,11 @@ def create_user(username:str, email:str, password:str, db=Depends(get_db)):
 
 
 @app.get("/login")
-def login(username:str, password:str, db=Depends(get_db)):
+def login(username: str, password: str, db=Depends(get_db)):
     user = db.query(User).filter(User.username == username).first()
-    return verify_password(password, user.password)
+    if verify_password(password, user.password):
+        return user.id
+    return "invalid password"
 
 
 @app.get("/users/{user_id}", response_model=UserResponse)
@@ -190,7 +194,7 @@ def get_project(project_id: int, db=Depends(get_db)):
     return project
 
 
-@app.get("/projects")
+@app.get("/projects", dependencies=[Depends(JwtBearer)])
 def get_all_projects_of_user(user_id, db=Depends(get_db)):
     project = db.query(Project).filter(Project.user_id == user_id).all()
     print(project)
@@ -230,7 +234,20 @@ def delete_project(project_id: int, db=Depends(get_db)):
     return project
 
 
-@app.post("/job_offer/{job_offer_id}", response_model=JobOfferCreate)
+@app.post("/create_employer_account/")
+def create_employer_account(name: str, email: str, password: str, company_name: str, db=Depends(get_db)):
+    password = get_hashed_password(password)
+    company = Company(name=company_name)
+    db.add(company)
+    db.commit()
+    db.refresh(company)
+    employer = Employer(name=name, password=password, email=email, company=company)
+    db.add(employer)
+    db.commit()
+    db.refresh()
+
+
+@app.post("/job_offer/{job_offer_id}", dependencies=[Depends(JwtBearer)], response_model=JobOfferCreate)
 def add_job_offer(position: str, required_skills: str, salary: int, job_description: str,
                   company_name: str, db=Depends(get_db)):
     try:
@@ -255,3 +272,11 @@ def get_offers(company_name, db=Depends(get_db)):
     company_id = db.query(Company).filter(Company.name == company_name).first().id
     job_offers = db.query(JobOffer).filter(JobOffer.company_id == company_id).all()
     return job_offers
+
+
+@app.post("/employer")
+def create_employer(name: str, email: str, password: str, company_name: str, db=Depends(get_db)):
+    try:
+        db.query(Company).filter(Company.name == company_name).first().id
+    except AttributeError:
+        return "dupa"

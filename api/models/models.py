@@ -1,6 +1,6 @@
 from sqlalchemy import INTEGER, FLOAT, BIGINT, VARCHAR, Column, ForeignKey
 from sqlalchemy.orm import relationship, Mapped, mapped_column
-from api.database_setup import Base
+from working_api_to_deploy.api.database_setup import Base
 
 
 class User(Base):
