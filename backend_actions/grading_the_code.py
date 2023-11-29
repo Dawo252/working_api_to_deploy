@@ -56,6 +56,8 @@ NON_EXTENSION_PHRASES = {
 
 class CodeGrader:
     def __init__(self, code_directory_path):  # or code_directory może być po prostu ścieżką do folderu? ewentualnie lista ścieżek do plików/ nazw plików
+        self.language = ""
+        self.type = ""
         self.code_directory_path = code_directory_path
         self.efficiency_score = 0
         self.coverage_score = 0

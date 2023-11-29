@@ -15,9 +15,8 @@ def task_1(self, **kwargs):  # change get user repos to be linear -> done
     print(github_something.repo_names_list)
     print(github_something.repo_paths_list)
     github_something.clone_repositories()
-    github_something.reorganize_repository(kwargs["folder"],
-                                           kwargs["folder"] + "2")
     github_something.remove_files_with_other_extensions()
+    github_something.reorganize_repository(kwargs["folder"], f"{kwargs['folder']}2")
 
     folder = kwargs["folder"] + "2"
     dir_dict = os.listdir(folder)
@@ -34,12 +33,13 @@ def task_1(self, **kwargs):  # change get user repos to be linear -> done
         temp_dict["reliability_score"] = code.reliability_score
         temp_dict["standarisation_score"] = code.standarisation_score
         grade_dict[repo] = temp_dict
+        print('one done')
 
     os.system(f"sudo rm -rf {kwargs['folder'] + '2'}")
     os.system(f"sudo rm -rf {kwargs['folder']}")
     os.system(f"sudo mkdir {kwargs['folder']}")
     os.system(f"sudo mkdir {kwargs['folder'] + '2'}")
-    os.system(f"sudo chmod 777 {kwargs['folder']} {kwargs['folder'] + '2'}")
+    os.system(f"sudo chmod 777 {kwargs['folder']} {kwargs['folder']}2")
     print("done and ready for next")
 
     return grade_dict
