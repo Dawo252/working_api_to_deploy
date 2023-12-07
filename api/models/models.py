@@ -50,4 +50,3 @@ class JobOffer(Base):
     salary: Mapped[int] = mapped_column(INTEGER)
     employer_id: Mapped[int] = mapped_column(BIGINT, ForeignKey("user.id"))
     employer: Mapped["User"] = relationship(back_populates="job_offers")
-    # company = relationship("Company", back_populates="job_offer")

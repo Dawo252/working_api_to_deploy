@@ -71,18 +71,18 @@ class GetUserRepos:
         user = github.get_user()
 
         # Wyświetl listę publicznych repozytoriów
-        for repo in user.get_repos():
+        for repo in user.get_repos(visibility="public"):
             url = f"https://{access_token}@github.com/" + repo.full_name
             self.repo_names_list.add(repo.full_name)
             self.repo_paths_list.add(url)
 
         # Wyświetl listę prywatnych repozytoriów
         # Tutaj dodamy potem checkbox na dostęp do prywatnych repo
-        for repo in user.get_repos(visibility="private"):
-            url = f"https://{access_token}@github.com/" + repo.full_name
-            self.repo_names_list.add(repo.full_name)
-            self.repo_paths_list.add(
-                url)
+        #for repo in user.get_repos(visibility="private"):
+           # url = f"https://{access_token}@github.com/" + repo.full_name
+            #self.repo_names_list.add(repo.full_name)
+            #self.repo_paths_list.add(
+            #    url)
 
     @staticmethod
     def clone_repository(repo_url, output_directory):

@@ -5,7 +5,7 @@ import re
 import os
 from coverage import Coverage
 import pytest
-
+from .reference_package_list import web_development_packages, ai_development_packages, data_analysis_packages
 from multiprocessing import Process, Lock, Queue
 
 
@@ -57,7 +57,7 @@ NON_EXTENSION_PHRASES = {
 class CodeGrader:
     def __init__(self, code_directory_path):  # or code_directory może być po prostu ścieżką do folderu? ewentualnie lista ścieżek do plików/ nazw plików
         self.language = ""
-        self.type = ""
+        self.types = None
         self.code_directory_path = code_directory_path
         self.efficiency_score = 0
         self.coverage_score = 0
@@ -338,10 +338,28 @@ class CodeGrader:
 
         return score
 
+    @staticmethod
+    def read_libraries_from_file(file_path):
+        libraries = []
+        with open(file_path, "r") as file:
+            lines = file.readlines()
+            for line in lines:
+                if line.startswith("import"):
+                    parts = line.strip().split()
+                    library = " ".join(parts[1:])
+                    libraries.append(library)
+        web_similar_packages = len(set(libraries).intersection(web_development_packages))
+        ai_similar_packages = len(set(libraries).intersection(ai_development_packages))
+        data_analysis_similar_packages = len(set(libraries).intersection(data_analysis_packages))
+        return {"web_similar_packages": web_similar_packages, "ai_similar_packages": ai_similar_packages,
+                "data_analysis_similar_packages": data_analysis_similar_packages}
+
     def run_single_file_tests(self):
+        library_type_dict = {"web_packages": 0, "data_analysis_packages": 0, "ai_packages": 0}
         print("starting run_single_file_tests")
         file_list = os.listdir(self.code_directory_path)
-        print(file_list)
+        file_ext_dict = {}
+        os_dict = {}
         # file_path_prefix = self.code_directory_path + "/"
         effeciency_score_sum = 0
         reliability_score_sum = 0
@@ -352,11 +370,25 @@ class CodeGrader:
             divider = 1
         prefix = self.code_directory_path
         for file_name in file_list:
-            print(file_name)
+            split_file = file_name.rsplit(".", 1)
+            split_len = len(split_file)
+            try:
+                if split_len > 1:
+                    os_dict[split_file[1]] += 1
+            except KeyError:
+                if split_len > 1:
+                    os_dict[split_file[1]] = 1
             effeciency_score_sum += self.evaluate_efficiency(prefix + f'/{file_name}')
             # reliability_score_sum += self.rate_code_reliability(prefix + f'/{file_name}')
             standarisation_score_sum += self.calculate_code_standardization_score(prefix + f'/{file_name}')
+            libraries_dict = self.read_libraries_from_file(prefix + f'/{file_name}')
+            library_type_dict["web_packages"] += libraries_dict["web_similar_packages"]
+            library_type_dict["data_analysis_packages"] += libraries_dict["data_analysis_similar_packages"]
+            library_type_dict["ai_packages"] += libraries_dict["ai_similar_packages"]
 
+        most_similar_libraries = max(library_type_dict.values())
+        self.language = max(os_dict, key=os_dict.get)
+        self.types = [key for key, value in library_type_dict.items() if value == most_similar_libraries]
         self.efficiency_score = effeciency_score_sum/divider
         self.reliability_score = reliability_score_sum/divider
         self.standarisation_score = standarisation_score_sum/divider
