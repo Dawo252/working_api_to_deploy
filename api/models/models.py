@@ -34,8 +34,8 @@ class Project(Base):
     coverage_score: Mapped[float] = mapped_column(FLOAT)
     reliability_score: Mapped[float] = mapped_column(FLOAT)
     standarisation_score: Mapped[float] = mapped_column(FLOAT)
-    type: Mapped[str] = mapped_column(VARCHAR())
-    language: Mapped[str] = mapped_column(VARCHAR())
+    type: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=True)
+    language: Mapped[str] = mapped_column(VARCHAR(), nullable=True)
     user_id: Mapped[int] = mapped_column(BIGINT, ForeignKey("user.id"))
     # Define the many-to-one relationship with User
     user: Mapped["User"] = relationship(back_populates="projects")

@@ -32,6 +32,8 @@ def task_1(self, **kwargs):  # change get user repos to be linear -> done
         temp_dict["efficiency_score"] = code.efficiency_score
         temp_dict["reliability_score"] = code.reliability_score
         temp_dict["standarisation_score"] = code.standarisation_score
+        temp_dict["language"] = code.language
+        temp_dict["types"] = code.types
         grade_dict[repo] = temp_dict
         print('one done')
 

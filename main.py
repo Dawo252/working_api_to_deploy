@@ -100,10 +100,6 @@ class UserLogin(BaseModel):
     name: str
     password: str
 
-SECRET_KEY = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 class Token(BaseModel):
     access_token: str
@@ -117,6 +113,11 @@ class TokenData(BaseModel):
 Base.metadata.create_all(bind=engine)
 pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
 
+SECRET_KEY = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login_for_token",
+scheme_name="JWT")
 
 def get_hashed_password(user_password):
     return pwd_context.hash(user_password)
@@ -143,7 +144,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     return encoded_jwt
 
 
-async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db):
+async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db=Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -163,12 +164,9 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db):
     return user
 
 
-@app.get("/get_user/me/", tags=['all'])
-async def get_user_me(
-    token, db = Depends(get_db)
-):
-    return await get_current_user(token, db)
-
+@app.get("/get_user/me/", tags=['all'], dependencies=[Depends(get_current_user)])
+async def get_user_me(current_user = Depends(get_current_user), db = Depends(get_db)):
+    return current_user
 
 @app.post("/login_for_token", response_model=Token, tags=['all'])
 async def login_for_access_token(
@@ -188,8 +186,8 @@ async def login_for_access_token(
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@app.post("/start/{access_token}", tags=['developer'])
-async def start(username, password, email, access_token=None, db=Depends(get_db)):
+@app.post("/create_developer_account/{access_token}", tags=['developer'])
+async def create_developer_account(username, password, email, access_token=None, db=Depends(get_db)):
     if access_token is None:
         return "give access token"
     password = get_hashed_password(password)
@@ -213,14 +211,15 @@ async def start(username, password, email, access_token=None, db=Depends(get_db)
         project = Project(name=name, vulnerability_score=ratings["vulnerability_score"],
                           efficiency_score=ratings["efficiency_score"], coverage_score=ratings["coverage_score"],
                           reliability_score=ratings["reliability_score"],
-                          standarisation_score=ratings["standarisation_score"], user_id=db.query(User).filter(User.username==username).first().id)
+                          standarisation_score=ratings["standarisation_score"], language=ratings["language"],
+                          type=ratings["types"], user_id=db.query(User).filter(User.username==username).first().id)
         db.add(project)
         db.commit()
         db.refresh(project)
     return {"user_id": user.id}
 
 
-@app.get("/get_employer/{user_id}", tags=['developer'], dependencies=[Depends(JwtBearer())])
+@app.get("/get_employer/{user_id}", tags=['developer'], dependencies=[Depends(get_current_user)])
 def get_employer(user_id: int, db=Depends(get_db)):
     # Retrieve a user by ID
     user = db.query(User).filter(User.id == user_id).first()
@@ -231,7 +230,7 @@ def get_employer(user_id: int, db=Depends(get_db)):
     return user
 
 
-@app.get("/get_developer/{user_id}", tags=['employer'], dependencies=[Depends(JwtBearer())])
+@app.get("/get_developer/{user_id}", tags=['employer'], dependencies=[Depends(get_current_user)])
 def get_developer(user_id: int, db=Depends(get_db)):
     # Retrieve a user by ID
     user = db.query(User).filter(User.id == user_id).first()
@@ -242,7 +241,7 @@ def get_developer(user_id: int, db=Depends(get_db)):
     return user
 
 
-@app.get("/get_all_users", tags=['tester_func'])
+@app.get("/get_all_users", tags=['tester_func'], dependencies=[Depends(get_current_user)])
 def get_all_users(db=Depends(get_db)):
     users = db.query(User).all()
     print(users)
@@ -253,7 +252,7 @@ def get_all_users(db=Depends(get_db)):
     return users
 
 
-@app.put("/update_user/{user_id}", tags=['admin'], response_model=UserResponse)
+@app.put("/update_user/{user_id}", tags=['admin'], response_model=UserResponse, dependencies=[Depends(get_current_user)])
 def update_user(user_id: int, username: str, password: str, db=Depends(get_db)):
     # Update a user by ID
     user = db.query(User).filter(User.id == user_id).first()
@@ -269,15 +268,13 @@ def update_user(user_id: int, username: str, password: str, db=Depends(get_db)):
     return {"message": "succesfully altered user"}
 
 
-@app.put("/update_user/me", tags=['all'], response_model=UserResponse)
-async def update_user_me(token: str, username: str, password: str, db=Depends(get_db)):
-    # Update a user by ID
-    user = await get_current_user(token, db)
-
+@app.put("/update_user/me", tags=['all'], response_model=UserResponse, dependencies=[Depends(get_current_user)])
+async def update_user_me(username: str, password: str, email: str, db=Depends(get_db), user = Depends(get_current_user)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
     user.username = username
+    user.email = email
     user.password = get_hashed_password(password)
     db.commit()
     db.refresh(user)
@@ -285,7 +282,7 @@ async def update_user_me(token: str, username: str, password: str, db=Depends(ge
     return {"message": "succesfully altered user"}
 
 
-@app.delete("/delete_user/{user_id}", tags=['admin'])
+@app.delete("/delete_user/{user_id}", tags=['admin'], dependencies=[Depends(get_current_user)])
 def delete_user(user_id: int, db=Depends(get_db)):
     # Delete a user by ID
     user = db.query(User).filter(User.id == user_id).first()
@@ -299,10 +296,8 @@ def delete_user(user_id: int, db=Depends(get_db)):
     return f"deleted user: {user}"
 
 
-@app.delete("/delete_user/me", tags=['all'])
-async def delete_user_me(token: str, db=Depends(get_db)):
-    # Delete a user by ID
-    user = await get_current_user(token, db)
+@app.delete("/delete_user/me", tags=['all'], dependencies=[Depends(get_current_user)])
+async def delete_user_me(user = Depends(get_current_user), db=Depends(get_db)):
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -313,7 +308,7 @@ async def delete_user_me(token: str, db=Depends(get_db)):
     return f"deleted user: {user}"
 
 
-@app.get("/get_project/{project_id}", tags=['all'], response_model=ProjectResponse)
+@app.get("/get_project/{project_id}", tags=['all'], response_model=ProjectResponse, dependencies=[Depends(get_current_user)])
 def get_project(project_id: int, db=Depends(get_db)):
     project = db.query(Project).filter(Project.id == project_id).first()
 
@@ -322,8 +317,8 @@ def get_project(project_id: int, db=Depends(get_db)):
     return project
 
 
-@app.get("/get_all_projects_of_user/{user_id}", tags=['all'])
-def get_all_projects_of_user(user_id, db=Depends(get_db)):
+@app.get("/get_all_projects_of_user/{user_id}", tags=['all'], dependencies=[Depends(get_current_user)])
+def get_all_projects_of_user(user_id: int, db=Depends(get_db)):
     project = db.query(Project).filter(Project.user_id == user_id).all()
     print(project)
     if not project:
@@ -331,16 +326,15 @@ def get_all_projects_of_user(user_id, db=Depends(get_db)):
     return project
 
 
-@app.get("/get_all_projects_of_user/me", tags=['all'])
-async def get_all_projects_of_user_me(token, db=Depends(get_db)):
-    user = await get_current_user(token, db)
+@app.get("/get_all_projects_of_user/me/{user_id}", tags=['all'], dependencies=[Depends(get_current_user)])
+async def get_all_projects_of_user_me(user = Depends(get_current_user), db=Depends(get_db)):
     project = db.query(Project).filter(Project.user_id == user.id).all()
     if not project:
         raise HTTPException(status_code=404, detail="Projects not found")
     return project
 
 
-@app.get("/all_projects", tags=['tester_func'])
+@app.get("/all_projects", tags=['tester_func'], dependencies=[Depends(get_current_user)])
 def get_all_projects(db=Depends(get_db)):
     project = db.query(Project).all()
     if not project:
@@ -348,7 +342,7 @@ def get_all_projects(db=Depends(get_db)):
     return project
 
 
-@app.delete("/delete_project/{project_id}", tags=['admin'])
+@app.delete("/delete_project/{project_id}", tags=['admin'], dependencies=[Depends(get_current_user)])
 def delete_project(project_id: int, db=Depends(get_db)):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -358,9 +352,8 @@ def delete_project(project_id: int, db=Depends(get_db)):
     return {"message": f"successfully deleted project with id: {project_id}"}
 
 
-@app.delete("/delete_project/me/{project_id}", tags=['developer'])
-async def delete_project_me(token, project_id: int, db=Depends(get_db)):
-    user = await get_current_user(token, db)
+@app.delete("/delete_project/me/{project_id}", tags=['developer'], dependencies=[Depends(get_current_user)])
+async def delete_project_me(project_id: int, user=Depends(get_current_user), db=Depends(get_db)):
     projects = db.query(Project).filter(Projects.user_id == user.id).all()
     project = projects.filter(Project.id == project_id).first()
     if not project:
@@ -370,10 +363,9 @@ async def delete_project_me(token, project_id: int, db=Depends(get_db)):
     return {"message": f"successfully deleted project with id: {project_id}"}
 
 
-@app.post("/add_job_offer/me/{job_offer_id}", tags=['employer'], response_model=JobOfferCreate)
-async def add_job_offer_me(token: str, position: str, required_skills: str, salary: int, job_description: str,
-                  company_name: str, db=Depends(get_db)):
-    user = await get_current_user(token, db)
+@app.post("/add_job_offer/me/{job_offer_id}", tags=['employer'], response_model=JobOfferCreate, dependencies=[Depends(get_current_user)])
+async def add_job_offer_me(position: str, required_skills: str, salary: int, job_description: str,
+                  company_name: str, db=Depends(get_db), user = Depends(get_current_user)):
     if user.employer_flag is False:
         return {"error_message": "you are not employer"}
     job_offer = JobOffer(position=position, required_skills=required_skills, salary=salary,
@@ -385,9 +377,9 @@ async def add_job_offer_me(token: str, position: str, required_skills: str, sala
                          job_description=job_description, employer_id=user_id)
 
 
-@app.post("/add_job_offer_temp_user/me/{job_offer_id}", tags=['employer'], response_model=JobOfferCreateTemp)
-async def add_job_offer_temp_user_me(token: str, position: str, required_skills: str, salary: int, job_description: str, db=Depends(get_db)):
-    user = await get_current_user(token, db)
+@app.post("/add_job_offer_temp_user/me/{job_offer_id}", tags=['employer'], response_model=JobOfferCreateTemp, dependencies=[Depends(get_current_user)])
+async def add_job_offer_temp_user_me(position: str, required_skills: str, salary: int, job_description: str, db=Depends(get_db),
+                  user=Depends(get_current_user)):
     required_skills = required_skills.split(',')
     if user.employer_flag is False:
         return {"error_message": "you are not employer"}
@@ -400,7 +392,7 @@ async def add_job_offer_temp_user_me(token: str, position: str, required_skills:
                          job_description=job_description, employer_id=user.id)
 
 
-@app.get("/job_offers/{employer_id}", tags=['developer'])
+@app.get("/job_offers/{employer_id}", tags=['developer'], dependencies=[Depends(get_current_user)])
 def get_offers_from_user(user_id:int, db=Depends(get_db)):
     employer = db.query(User).filter(User.id == user_id).first()
     if employer.employer_flag is False:
@@ -418,7 +410,7 @@ def create_employer_account(username: str, email: str, password: str, db=Depends
     return {"message": "succesfully added employer", "employer_id": employer.id}
 
 
-@app.get("/get_companies", tags=['tester_func'])
+@app.get("/get_companies", tags=['tester_func'], dependencies=[Depends(get_current_user)])
 def get_companies(db=Depends(get_db)):
     companies = db.query(Company).all()
     if not companies:
