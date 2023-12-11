@@ -1,0 +1,315 @@
+from celery_app.utils import create_celery
+from tasks.task_1 import task_1
+from fastapi import Depends
+from fastapi import FastAPI, HTTPException
+import time
+from pydantic import BaseModel
+from mangum import Mangum
+from auth.JWT_handler import sign_jwt
+from auth.JWT_bearer import JwtBearer
+from api.database_setup import Base, engine, get_db
+from api.models.models import User, JobOffer, Employer, Project, Company
+from passlib.context import CryptContext
+from celery.result import AsyncResult
+import asyncio
+from fastapi import Body
+
+# FastAPI instance
+app = FastAPI()
+
+handler = Mangum(app)
+app.celery_app = create_celery()
+celery = app.celery_app
+
+
+# Pydantic Model for User (response)
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    email: str
+
+
+# Pydantic Model for User (request - create/update)
+class UserCreate(BaseModel):
+    id: int
+    email: str
+    username: str
+    password: str
+
+
+class ProjectResponse(BaseModel):
+    id: int
+    name: str
+    vulnerability_score: float
+    efficiency_score: float
+    coverage_score: float
+    reliability_score: float
+    standarisation_score: float
+    user_id: int
+
+
+# Pydantic Model for Project (request - create/update)
+
+
+class ProjectCreate(BaseModel):
+    name: str
+    vulnerability_score: float
+    efficiency_score: float
+    coverage_score: float
+    reliability_score: float
+    standarisation_score: float
+    user_id: int
+
+
+class CompanyCreate(BaseModel):
+    id: int
+    name: str
+
+
+class CompanyResponse(BaseModel):
+    id: int
+    name: str
+
+
+class JobOfferCreate(BaseModel):
+    id: int
+    position: str
+    required_skills: str
+    salary: int
+    job_description: str
+    company_id: int
+
+
+class UserLogin(BaseModel):
+    name: str
+    password: str
+
+
+#will create table into database
+Base.metadata.create_all(bind=engine)
+pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
+
+
+def get_hashed_password(user_password):
+    return pwd_context.hash(user_password)
+
+
+def verify_password(plain_text_password, hashed_password):
+    return pwd_context.verify(plain_text_password, hashed_password)
+
+
+@app.post("/start/{access_token}", tags=['developer'])
+async def start(username, password, email, access_token=None, db=Depends(get_db)):
+    if access_token is None:
+        return "give access token"
+    password = get_hashed_password(password)
+    user = User(username=username, password=password, email=email)
+    db.add(user)
+    print(user.id)
+    db.commit()
+    db.refresh(user)
+    kwargs = {"access_token": access_token, "folder": "/home/ubuntu/tests/testtt"}
+    result = task_1.apply_async(queue="user_github_que2", kwargs={"access_token": access_token, "folder": "/home/ubuntu/tests/testtt"})
+    async def wait_for_result(result):
+        while not result.ready():
+            await asyncio.sleep(1)
+        return result.get(timeout=1)
+
+    if result.ready():
+        projects = result.get(timeout=1)
+    else:
+        projects = await wait_for_result(result)
+    for name, ratings in projects.items():
+        project = Project(name=name, vulnerability_score=ratings["vulnerability_score"],
+                          efficiency_score=ratings["efficiency_score"], coverage_score=ratings["coverage_score"],
+                          reliability_score=ratings["reliability_score"],
+                          standarisation_score=ratings["standarisation_score"], user_id=db.query(User).filter(User.username==username).first().id)
+        db.add(project)
+        db.commit()
+        db.refresh(project)
+    return {"user_id": user.id}, sign_jwt(user.email)
+
+
+def check_user(employer, password):
+    if verify_password(password, employer.password):
+        return employer
+    return False
+
+
+@app.post("/login2", tags=['auth_test'])
+def login2(user: UserLogin = Body(), db=Depends(get_db)):
+    employer = db.query(Employer).filter(Employer.name == user.name).first()
+    if check_user(employer, user.password):
+        return sign_jwt(employer.email)
+    else:
+        return {"message": "invalid login details"}
+
+
+@app.post("/login")
+def login(username:str, password:str, db=Depends(get_db)):
+    user = db.query(User).filter(User.username == username).first()
+    if verify_password(password, user.password):
+        return {"user_id": user_id}
+    return {"error": "invalid password"}
+
+
+@app.get("/get_user/{user_id}", tags=['developer'])
+def get_user(user_id: int, db=Depends(get_db)):
+    # Retrieve a user by ID
+    user = db.query(User).filter(User.id == user_id).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return user
+
+
+@app.get("/get_all_users", tags=['tester_func'])
+def get_all_users(db=Depends(get_db)):
+    users = db.query(User).all()
+    print(users)
+
+    if not users:
+        raise HTTPException(status_code=404, detail="Users not found")
+
+    return users
+
+
+@app.put("/update_user/{user_id}", tags=['developer'], response_model=UserResponse)
+def update_user(user_id: int, username: str, password: str, db=Depends(get_db)):
+    # Update a user by ID
+    user = db.query(User).filter(User.id == user_id).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.username = username
+    user.password = get_hashed_password(password)
+    db.commit()
+    db.refresh(user)
+
+    return {"message": "succesfully altered user"}
+
+
+@app.delete("/delete_user/{user_id}", tags=['developer'])
+def delete_user(user_id: int, db=Depends(get_db)):
+    # Delete a user by ID
+    user = db.query(User).filter(User.id == user_id).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    db.delete(user)
+    db.commit()
+
+    return f"deleted user: {user}"
+
+
+@app.get("/get_project/{project_id}", tags=['developer'], response_model=ProjectResponse)
+def get_project(project_id: int, db=Depends(get_db)):
+    project = db.query(Project).filter(Project.id == project_id).first()
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return project
+
+
+@app.get("/get_all_projects_of_user/{user_id}", tags=['developer'])
+def get_all_projects_of_user(user_id, db=Depends(get_db)):
+    project = db.query(Project).filter(Project.user_id == user_id).all()
+    print(project)
+    if not project:
+        raise HTTPException(status_code=404, detail="Projects not found")
+    return project
+
+
+@app.get("/all_projects", tags=['tester_func'])
+def get_all_projects(db=Depends(get_db)):
+    project = db.query(Project).all()
+    print(project)
+    if not project:
+        raise HTTPException(status_code=404, detail="Projects not found")
+    return project
+
+
+@app.put("/update_project/{project_id}", tags=['developer'], response_model=ProjectResponse)
+def update_project(project_id: int, project_data: ProjectCreate, db=Depends(get_db)):
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    for field, value in project_data.dict().items():
+        setattr(project, field, value)
+    db.commit()
+    db.refresh(project)
+    return project
+
+
+@app.delete("/delete_project/{project_id}", tags=['developer'])
+def delete_project(project_id: int, db=Depends(get_db)):
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    db.delete(project)
+    db.commit()
+    return {"message": f"successfully deleted project with id: {project_id}"}
+
+
+@app.post("/add_job_offer/{job_offer_id}", tags=['employer'], response_model=JobOfferCreate)
+def add_job_offer(position: str, required_skills: list, salary: int, job_description: str,
+                  company_name: str, db=Depends(get_db)):
+    try:
+        db.query(Company).filter(Company.name == company_name).first().id
+    except AttributeError:
+        company = Company(name=company_name)
+        db.add(company)
+        db.commit()
+        db.refresh(company)
+    company_id = db.query(Company).filter(Company.name == company_name).first().id
+    job_offer = JobOffer(position=position, required_skills=required_skills, salary=salary,
+                         job_description=job_description, company_id=company_id)
+    db.add(job_offer)
+    db.commit()
+    db.refresh(job_offer)
+    return JobOfferCreate(id=job_offer.id, position=position, required_skills=required_skills, salary=salary,
+                         job_description=job_description, company_id=company_id)
+
+
+@app.get("/job_offers")
+def get_offers(company_name, db=Depends(get_db)):
+    company_id = db.query(Company).filter(Company.name == company_name).first().id
+    job_offers = db.query(JobOffer).filter(JobOffer.company_id == company_id).all()
+    return job_offers
+
+
+@app.post("/create_employer_account", tags=['employer'])
+def create_employer_account(name: str, email: str, password: str, company_name: str, db=Depends(get_db)):
+    try:
+        db.query(Company).filter(Company.name == company_name).first().id
+    except AttributeError:
+        company = Company(name=company_name)
+        db.add(company)
+        db.commit()
+        db.refresh(company)
+    employer = Employer(name=name, email=email, password=get_hashed_password(password), company_id=company.id, company=company)
+    db.add(employer)
+    db.commit()
+    db.refresh(employer)
+    return {"message": "succesfully added employer", "employer_id": employer.id}
+
+
+@app.post("/get_employers", tags=['employer'])
+def get_employers(db=Depends(get_db)):
+    employers = db.query(Employer).all()
+    if not employers:
+        raise HTTPException(status_code=404, detail="no employers")
+
+    return {"employers": employers}
+
+
+@app.post("/get_companies", tags=['employer'])
+def get_companies(db=Depends(get_db)):
+    companies  = db.query(Company).all()
+    if not companies:
+        raise HTTPException(status_code=404, detail="no companies")
+
+    return {"companies": companies}

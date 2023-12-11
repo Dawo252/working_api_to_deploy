@@ -5,7 +5,7 @@ import re
 import os
 from coverage import Coverage
 import pytest
-
+from .reference_package_list import web_development_packages, ai_development_packages, data_analysis_packages
 from multiprocessing import Process, Lock, Queue
 
 
@@ -56,6 +56,8 @@ NON_EXTENSION_PHRASES = {
 
 class CodeGrader:
     def __init__(self, code_directory_path):  # or code_directory może być po prostu ścieżką do folderu? ewentualnie lista ścieżek do plików/ nazw plików
+        self.language = ""
+        self.types = None
         self.code_directory_path = code_directory_path
         self.efficiency_score = 0
         self.coverage_score = 0
@@ -97,7 +99,8 @@ class CodeGrader:
     @staticmethod
     def rate_code_reliability(file_path):  # -> pamiętaj, żeby zrobić iterację po folderze
         print("starting rate_code_reliability")
-        os.chmod(file_path, 0o777)
+        os.system(f"sudo chmod 777 {file_path}")
+        #os.chmod(file_path, 0o777)
         pylint_output = pylint.lint.Run([file_path], do_exit=False)
         pylint_score = None
         reliability_score = None
@@ -254,18 +257,27 @@ class CodeGrader:
             documentation_url = file_list[index]
         else:
             return 0
-        os.chmod(documentation_url, 0o777)
+        os.system(f"sudo chmod 777 {document_url}")
         with open(documentation_url, 'r+', encoding="utf-8") as file:
             documentation = file.read()
         print(documentation)
 
     def calculate_code_standardization_score(self, file_path):   # -> pamiętaj, żeby zrobić iterację po folderze
         print("starting calculate_code_standardization_score")
-        os.chmod(file_path, 0o777)
-        with open(file_path, 'r+', encoding="utf-8") as file:
-            # print("started reading the code")
-            code = file.read()
-            # print("read the code")
+        os.system(f"sudo chmod 777 {file_path}")
+        try:
+            with open(file_path, 'r+', encoding="utf-8") as file:
+                # print("started reading the code")
+                code = file.read()
+                # print("read the code")
+        except UnicodeDecodeError:
+            try:
+                with open(file_path, 'r+', encoding="latin1", ) as file:
+                    # print("started reading the code")
+                    code = file.read()
+                    # print("read the code")
+            except Exception:
+                pass
         score = 0
         max_score = 80  # Maksymalna liczba punktów za podstawowe kryteria
 
@@ -326,10 +338,28 @@ class CodeGrader:
 
         return score
 
+    @staticmethod
+    def read_libraries_from_file(file_path):
+        libraries = []
+        with open(file_path, "r") as file:
+            lines = file.readlines()
+            for line in lines:
+                if line.startswith("import"):
+                    parts = line.strip().split()
+                    library = " ".join(parts[1:])
+                    libraries.append(library)
+        web_similar_packages = len(set(libraries).intersection(web_development_packages))
+        ai_similar_packages = len(set(libraries).intersection(ai_development_packages))
+        data_analysis_similar_packages = len(set(libraries).intersection(data_analysis_packages))
+        return {"web_similar_packages": web_similar_packages, "ai_similar_packages": ai_similar_packages,
+                "data_analysis_similar_packages": data_analysis_similar_packages}
+
     def run_single_file_tests(self):
+        library_type_dict = {"web_packages": 0, "data_analysis_packages": 0, "ai_packages": 0}
         print("starting run_single_file_tests")
         file_list = os.listdir(self.code_directory_path)
-        print(file_list)
+        file_ext_dict = {}
+        os_dict = {}
         # file_path_prefix = self.code_directory_path + "/"
         effeciency_score_sum = 0
         reliability_score_sum = 0
@@ -340,11 +370,25 @@ class CodeGrader:
             divider = 1
         prefix = self.code_directory_path
         for file_name in file_list:
-            print(file_name)
+            split_file = file_name.rsplit(".", 1)
+            split_len = len(split_file)
+            try:
+                if split_len > 1:
+                    os_dict[split_file[1]] += 1
+            except KeyError:
+                if split_len > 1:
+                    os_dict[split_file[1]] = 1
             effeciency_score_sum += self.evaluate_efficiency(prefix + f'/{file_name}')
             # reliability_score_sum += self.rate_code_reliability(prefix + f'/{file_name}')
             standarisation_score_sum += self.calculate_code_standardization_score(prefix + f'/{file_name}')
+            libraries_dict = self.read_libraries_from_file(prefix + f'/{file_name}')
+            library_type_dict["web_packages"] += libraries_dict["web_similar_packages"]
+            library_type_dict["data_analysis_packages"] += libraries_dict["data_analysis_similar_packages"]
+            library_type_dict["ai_packages"] += libraries_dict["ai_similar_packages"]
 
+        most_similar_libraries = max(library_type_dict.values())
+        self.language = max(os_dict, key=os_dict.get)
+        self.types = [key for key, value in library_type_dict.items() if value == most_similar_libraries]
         self.efficiency_score = effeciency_score_sum/divider
         self.reliability_score = reliability_score_sum/divider
         self.standarisation_score = standarisation_score_sum/divider
